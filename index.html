@@ -47,7 +47,7 @@
         const blueIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
         function initMap() {
-            map = L.map('map').setView([-6.2000, 106.8166], 13);
+            map = L.map('map').setView([0, 0], 2); // Default zoom dunia
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map);
             markerKurir = L.marker([0,0], {icon: blueIcon}).addTo(map);
@@ -57,9 +57,9 @@
                 navigator.geolocation.getCurrentPosition(pos => {
                     const lat = pos.coords.latitude; const lng = pos.coords.longitude;
                     markerUser.setLatLng([lat, lng]);
-                    map.setView([lat, lng], 15);
+                    map.setView([lat, lng], 16); // Fokus ke lokasi User
                     db.ref('tracking/transaksi_1/user').set({ lat, lng });
-                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Lokasi ditemukan. Silakan pilih kurir.";
+                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Siap untuk pesanan baru.";
                 });
             }
 
@@ -69,20 +69,17 @@
                     resetUI();
                     return;
                 }
-
                 if (data.pesan) document.getElementById('dialogBox').innerHTML = `<b>Pesan:</b> ${data.pesan.teks}`;
-
                 if (data.status === 'dipilih' || data.status === 'on_way') {
                     document.getElementById('btnPilih').style.display = "none";
                     document.getElementById('btnTerima').style.display = "block";
                     document.getElementById('btnBatal').style.display = "block";
                 }
-
                 if (data.kurir) {
                     const kPos = [data.kurir.lat, data.kurir.lng];
                     markerKurir.setLatLng(kPos);
                     routeLine.setLatLngs([markerUser.getLatLng(), kPos]);
-                    // Auto zoom agar kurir & user terlihat
+                    // Saat pengantaran, zoom ke kedua icon
                     const group = new L.featureGroup([markerKurir, markerUser]);
                     map.fitBounds(group.getBounds().pad(0.2));
                 }
@@ -107,7 +104,6 @@
             document.getElementById('btnPilih').style.display = "block";
             document.getElementById('btnTerima').style.display = "none";
             document.getElementById('btnBatal').style.display = "none";
-            routeLine.setLatLngs([]);
         }
         initMap();
     </script>
