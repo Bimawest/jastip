@@ -3,72 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacak Kurir - Realtime Route</title>
+    <title>Lacak Pesanan - Hijau</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; }
-        #map { width: 100%; height: 100vh; }
-        .status-overlay { position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        body { margin: 0; font-family: sans-serif; }
+        #map { width: 100%; height: 70vh; }
+        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 20px; z-index: 1000; border-radius: 20px 20px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
+        #btnPilih { background: #007bff; color: white; border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; }
+        #notifPesan { background: #fff3cd; padding: 10px; margin-bottom: 10px; border-radius: 5px; display: none; border: 1px solid #ffeeba; }
     </style>
 </head>
 <body>
-    <div class="status-overlay"><b>Status:</b> <span id="msg">Menunggu Kurir...</span></div>
     <div id="map"></div>
+    <div class="overlay">
+        <div id="notifPesan"></div>
+        <div id="infoKurir">
+            <h4>Kurir Aktif Tersedia</h4>
+            <button id="btnPilih" onclick="pilihKurir()">Pilih Kurir Ini</button>
+        </div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Gunakan config yang sama dengan kurir
-        const firebaseConfig = {
-            apiKey: "AIzaSyCSwZqJAUvacT-oMJCtgp9tfCfCqxOM9CU",
-            authDomain: "jastiptrackingbima.firebaseapp.com",
-            databaseURL: "https://jastiptrackingbima-default-rtdb.asia-southeast1.firebasedatabase.app/",
-            projectId: "jastiptrackingbima"
-        };
+        const firebaseConfig = { /* Pakai Config Anda */ };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let map, markerKurir, markerUser, routeLine;
+        let map, markerKurir, markerUser;
+        const greenIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+        const blueIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
         function initMap() {
             map = L.map('map').setView([-6.2000, 106.8166], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map).bindPopup("Lokasi Saya");
+            markerKurir = L.marker([0,0], {icon: blueIcon}).addTo(map);
 
-            markerKurir = L.marker([0,0]).addTo(map).bindPopup("Kurir");
-            markerUser = L.marker([0,0]).addTo(map).bindPopup("Saya (User)");
-            routeLine = L.polyline([], {color: 'blue', weight: 5, dashArray: '10, 10'}).addTo(map);
-
-            // 1. Kirim lokasi User ke Firebase agar Kurir bisa melihat
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(pos => {
-                    const myPos = [pos.coords.latitude, pos.coords.longitude];
-                    markerUser.setLatLng(myPos);
-                    db.ref('tracking/transaksi_1/user').set({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    const lat = pos.coords.latitude; const lng = pos.coords.longitude;
+                    markerUser.setLatLng([lat, lng]);
+                    map.setView([lat, lng], 15);
+                    db.ref('tracking/transaksi_1/user').set({ lat, lng });
                 });
             }
 
-            // 2. Pantau pergerakan Kurir
-            db.ref('tracking/transaksi_1/kurir').on('value', snapshot => {
-                const data = snapshot.val();
-                if(data) {
-                    const kurirPos = [data.lat, data.lng];
-                    markerKurir.setLatLng(kurirPos);
-                    updateRoute();
-                    document.getElementById('msg').innerText = "Kurir sedang dalam perjalanan!";
+            // Dapatkan pesan dari Kurir
+            db.ref('tracking/transaksi_1/pesan').on('value', snap => {
+                if(snap.val()) {
+                    const notif = document.getElementById('notifPesan');
+                    notif.style.display = "block";
+                    notif.innerHTML = `<b>Pesan Kurir:</b> ${snap.val().teks}`;
                 }
+            });
+
+            // Pantau lokasi Kurir
+            db.ref('tracking/transaksi_1/kurir').on('value', snap => {
+                if(snap.val()) markerKurir.setLatLng([snap.val().lat, snap.val().lng]);
             });
         }
 
-        function updateRoute() {
-            const points = [markerKurir.getLatLng(), markerUser.getLatLng()];
-            if (points[0].lat !== 0 && points[1].lat !== 0) {
-                routeLine.setLatLngs(points);
-                map.fitBounds(routeLine.getBounds(), {padding: [50, 50]});
-            }
+        function pilihKurir() {
+            db.ref('tracking/transaksi_1/status').set('dipilih');
+            document.getElementById('btnPilih').innerText = "Menunggu Konfirmasi Kurir...";
+            document.getElementById('btnPilih').disabled = true;
         }
-
         initMap();
     </script>
 </body>
