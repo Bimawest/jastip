@@ -3,21 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacak Pesanan - Hijau</title>
+    <title>Lacak Pesanan - User</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: sans-serif; }
-        #map { width: 100%; height: 75vh; }
-        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 20px; z-index: 1000; border-radius: 20px 20px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); box-sizing: border-box; }
-        #btnPilih { background: #007bff; color: white; border: none; padding: 15px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-        #notifPesan { background: #e3f2fd; padding: 12px; margin-bottom: 10px; border-radius: 8px; display: none; border: 1px solid #bbdefb; color: #0d47a1; }
+        #map { width: 100%; height: 65vh; }
+        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 15px; z-index: 1000; border-radius: 20px 20px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); box-sizing: border-box; }
+        .btn { border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        #btnPilih { background: #007bff; color: white; }
+        #btnTerima { background: #28a745; color: white; display: none; }
+        #btnBatal { background: #dc3545; color: white; display: none; }
+        #dialogBox { background: #f8f9fa; padding: 10px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid #007bff; min-height: 40px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="overlay">
-        <div id="notifPesan"></div>
-        <button id="btnPilih" onclick="pilihKurir()">Pilih Kurir Jastip</button>
+        <div id="dialogBox"><b>Sistem:</b> Silakan pilih kurir...</div>
+        <button id="btnPilih" class="btn" onclick="pilihKurir()">Pilih Kurir Jastip</button>
+        <button id="btnTerima" class="btn" onclick="selesaikanPesanan('Diterima')">Pesanan Telah Diterima</button>
+        <button id="btnBatal" class="btn" onclick="selesaikanPesanan('Dibatalkan')">Batalkan Pengantaran</button>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
@@ -34,7 +39,6 @@
             messagingSenderId: "187742172528",
             appId: "1:187742172528:web:0556ec9c738476faff0bb5"
         };
-
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
@@ -45,7 +49,7 @@
         function initMap() {
             map = L.map('map').setView([-6.2000, 106.8166], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map).bindPopup("Lokasi Saya");
+            markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map);
             markerKurir = L.marker([0,0], {icon: blueIcon}).addTo(map);
             routeLine = L.polyline([], {color: 'blue', weight: 4, dashArray: '5, 10'}).addTo(map);
 
@@ -58,28 +62,41 @@
                 });
             }
 
-            db.ref('tracking/transaksi_1/pesan').on('value', snap => {
-                if(snap.val()) {
-                    const notif = document.getElementById('notifPesan');
-                    notif.style.display = "block";
-                    notif.innerHTML = `<b>Pesan:</b> ${snap.val().teks}`;
-                }
-            });
+            // Pantau Status & Pesan
+            db.ref('tracking/transaksi_1').on('value', snap => {
+                const data = snap.val();
+                if (!data) return;
 
-            db.ref('tracking/transaksi_1/kurir').on('value', snap => {
-                if(snap.val()) {
-                    const kPos = [snap.val().lat, snap.val().lng];
-                    markerKurir.setLatLng(kPos);
-                    const uPos = markerUser.getLatLng();
-                    if(uPos.lat !== 0) routeLine.setLatLngs([kPos, uPos]);
+                if (data.pesan) {
+                    document.getElementById('dialogBox').innerHTML = `<b>Pesan:</b> ${data.pesan.teks}`;
+                }
+
+                if (data.status === 'dipilih' || data.status === 'on_way') {
+                    document.getElementById('btnPilih').style.display = "none";
+                    document.getElementById('btnTerima').style.display = "block";
+                    document.getElementById('btnBatal').style.display = "block";
+                } else if (data.status === 'standby') {
+                    location.reload(); // Reset ke awal
+                }
+
+                if (data.kurir) {
+                    markerKurir.setLatLng([data.kurir.lat, data.kurir.lng]);
+                    routeLine.setLatLngs([markerUser.getLatLng(), markerKurir.getLatLng()]);
                 }
             });
         }
 
         function pilihKurir() {
             db.ref('tracking/transaksi_1/status').set('dipilih');
-            document.getElementById('btnPilih').innerText = "Menunggu Konfirmasi...";
-            document.getElementById('btnPilih').disabled = true;
+            db.ref('tracking/transaksi_1/pesan').set({ teks: "Menunggu konfirmasi kurir..." });
+        }
+
+        function selesaikanPesanan(aksi) {
+            alert("Pesanan " + aksi);
+            db.ref('tracking/transaksi_1').update({ 
+                status: 'standby',
+                pesan: { teks: "Pesanan telah " + aksi + ". Kembali ke menu utama." }
+            });
         }
         initMap();
     </script>
