@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacak Pesanan - User</title>
+    <title>Lacak Pesanan - User (Hijau)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; }
+        body { margin: 0; font-family: sans-serif; background: #f0f2f5; }
         #map { width: 100%; height: 65vh; }
-        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 15px; z-index: 1000; border-radius: 20px 20px 0 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); box-sizing: border-box; }
-        .btn { border: none; padding: 12px; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 5px; }
+        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 20px; z-index: 1000; border-radius: 25px 25px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
+        .btn { border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 16px; }
         #btnPilih { background: #007bff; color: white; }
         #btnTerima { background: #28a745; color: white; display: none; }
         #btnBatal { background: #dc3545; color: white; display: none; }
-        #dialogBox { background: #f8f9fa; padding: 10px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid #007bff; font-size: 14px; }
+        #dialogBox { background: #e3f2fd; padding: 12px; margin-bottom: 12px; border-radius: 10px; border-left: 5px solid #007bff; font-size: 14px; color: #0d47a1; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div class="overlay">
-        <div id="dialogBox"><b>Sistem:</b> Silakan pilih kurir tersedia...</div>
+        <div id="dialogBox"><b>Sistem:</b> Mencari lokasi Anda...</div>
         <button id="btnPilih" class="btn" onclick="pilihKurir()">Pilih Kurir Jastip</button>
         <button id="btnTerima" class="btn" onclick="selesaikanPesanan('Diterima')">Pesanan Telah Diterima</button>
         <button id="btnBatal" class="btn" onclick="selesaikanPesanan('Dibatalkan')">Batalkan Pengantaran</button>
@@ -51,7 +51,7 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map);
             markerKurir = L.marker([0,0], {icon: blueIcon}).addTo(map);
-            routeLine = L.polyline([], {color: 'blue', weight: 4, dashArray: '5, 10'}).addTo(map);
+            routeLine = L.polyline([], {color: 'blue', weight: 3, dashArray: '5, 8'}).addTo(map);
 
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(pos => {
@@ -59,19 +59,14 @@
                     markerUser.setLatLng([lat, lng]);
                     map.setView([lat, lng], 15);
                     db.ref('tracking/transaksi_1/user').set({ lat, lng });
+                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Lokasi ditemukan. Silakan pilih kurir.";
                 });
             }
 
-            // PERBAIKAN LISTENER: Menghindari Loop Reload
             db.ref('tracking/transaksi_1').on('value', snap => {
                 const data = snap.val();
                 if (!data) {
-                    // Jika data dihapus, kembalikan UI ke awal tanpa reload
-                    document.getElementById('btnPilih').style.display = "block";
-                    document.getElementById('btnTerima').style.display = "none";
-                    document.getElementById('btnBatal').style.display = "none";
-                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Siap untuk pesanan baru.";
-                    routeLine.setLatLngs([]);
+                    resetUI();
                     return;
                 }
 
@@ -87,6 +82,9 @@
                     const kPos = [data.kurir.lat, data.kurir.lng];
                     markerKurir.setLatLng(kPos);
                     routeLine.setLatLngs([markerUser.getLatLng(), kPos]);
+                    // Auto zoom agar kurir & user terlihat
+                    const group = new L.featureGroup([markerKurir, markerUser]);
+                    map.fitBounds(group.getBounds().pad(0.2));
                 }
             });
         }
@@ -99,11 +97,17 @@
         }
 
         function selesaikanPesanan(aksi) {
-            // Hapus data agar tidak terjadi loop reload
             db.ref('tracking/transaksi_1').remove().then(() => {
                 alert("Pesanan " + aksi);
                 location.reload(); 
             });
+        }
+
+        function resetUI() {
+            document.getElementById('btnPilih').style.display = "block";
+            document.getElementById('btnTerima').style.display = "none";
+            document.getElementById('btnBatal').style.display = "none";
+            routeLine.setLatLngs([]);
         }
         initMap();
     </script>
