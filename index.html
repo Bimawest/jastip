@@ -30,7 +30,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // KONFIGURASI BENAR
         const firebaseConfig = {
             apiKey: "AIzaSyCSwZqJAUvacT-oMJCtgp9tfCfCqxOM9CU",
             authDomain: "jastiptrackingbima.firebaseapp.com",
@@ -40,7 +39,6 @@
             messagingSenderId: "187742172528",
             appId: "1:187742172528:web:0556ec9c738476faff0bb5"
         };
-
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
@@ -64,9 +62,18 @@
                 });
             }
 
+            // PERBAIKAN LISTENER: Menghindari Loop Reload
             db.ref('tracking/transaksi_1').on('value', snap => {
                 const data = snap.val();
-                if (!data) return;
+                if (!data) {
+                    // Jika data dihapus, kembalikan UI ke awal tanpa reload
+                    document.getElementById('btnPilih').style.display = "block";
+                    document.getElementById('btnTerima').style.display = "none";
+                    document.getElementById('btnBatal').style.display = "none";
+                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Siap untuk pesanan baru.";
+                    routeLine.setLatLngs([]);
+                    return;
+                }
 
                 if (data.pesan) document.getElementById('dialogBox').innerHTML = `<b>Pesan:</b> ${data.pesan.teks}`;
 
@@ -74,9 +81,6 @@
                     document.getElementById('btnPilih').style.display = "none";
                     document.getElementById('btnTerima').style.display = "block";
                     document.getElementById('btnBatal').style.display = "block";
-                } else if (data.status === 'standby') {
-                    alert("Aplikasi reset ke menu awal.");
-                    location.reload(); 
                 }
 
                 if (data.kurir) {
@@ -95,9 +99,10 @@
         }
 
         function selesaikanPesanan(aksi) {
-            db.ref('tracking/transaksi_1').update({ 
-                status: 'standby',
-                pesan: { teks: "Pesanan telah " + aksi + ". Terimakasih!" }
+            // Hapus data agar tidak terjadi loop reload
+            db.ref('tracking/transaksi_1').remove().then(() => {
+                alert("Pesanan " + aksi);
+                location.reload(); 
             });
         }
         initMap();
