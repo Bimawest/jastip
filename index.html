@@ -3,26 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lacak Pesanan - User (Hijau)</title>
+    <title>Jastip Bima - User</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; background: #f0f2f5; }
-        #map { width: 100%; height: 65vh; }
-        .overlay { position: absolute; bottom: 0; width: 100%; background: white; padding: 20px; z-index: 1000; border-radius: 25px 25px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); box-sizing: border-box; }
-        .btn { border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; cursor: pointer; margin-top: 8px; font-size: 16px; }
-        #btnPilih { background: #007bff; color: white; }
-        #btnTerima { background: #28a745; color: white; display: none; }
-        #btnBatal { background: #dc3545; color: white; display: none; }
-        #dialogBox { background: #e3f2fd; padding: 12px; margin-bottom: 12px; border-radius: 10px; border-left: 5px solid #007bff; font-size: 14px; color: #0d47a1; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8f9fa; }
+        #map { width: 100%; height: 40vh; }
+        .container { padding: 15px; }
+        .katalog { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        .card { background: white; padding: 10px; border-radius: 12px; shadow: 0 2px 5px rgba(0,0,0,0.1); text-align: center; border: 1px solid #ddd; }
+        .card img { width: 100%; height: 80px; object-fit: cover; border-radius: 8px; }
+        .btn-pesan { background: #28a745; color: white; border: none; padding: 8px; width: 100%; border-radius: 5px; margin-top: 5px; cursor: pointer; }
+        .overlay-status { position: fixed; bottom: 0; width: 100%; background: white; padding: 20px; border-radius: 20px 20px 0 0; display: none; z-index: 2000; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
+        #dialogBox { background: #e3f2fd; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <div class="overlay">
-        <div id="dialogBox"><b>Sistem:</b> Mencari lokasi Anda...</div>
-        <button id="btnPilih" class="btn" onclick="pilihKurir()">Pilih Kurir Jastip</button>
-        <button id="btnTerima" class="btn" onclick="selesaikanPesanan('Diterima')">Pesanan Telah Diterima</button>
-        <button id="btnBatal" class="btn" onclick="selesaikanPesanan('Dibatalkan')">Batalkan Pengantaran</button>
+    <div class="container" id="mainMenu">
+        <h3>Katalog UMKM Mitra</h3>
+        <div class="katalog">
+            <div class="card">
+                <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200" alt="Warung">
+                <div style="font-weight:bold">Warung Sederhana</div>
+                <button class="btn-pesan" onclick="buatPesanan('Warung Sederhana')">Pesan Jastip</button>
+            </div>
+            <div class="card">
+                <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=200" alt="Toko">
+                <div style="font-weight:bold">Toko Kelontong Ica</div>
+                <button class="btn-pesan" onclick="buatPesanan('Toko Kelontong Ica')">Pesan Jastip</button>
+            </div>
+            <div class="card">
+                <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200" alt="UMKM">
+                <div style="font-weight:bold">UMKM Snack Bima</div>
+                <button class="btn-pesan" onclick="buatPesanan('UMKM Snack Bima')">Pesan Jastip</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay-status" id="statusOrder">
+        <div id="dialogBox">Mencari kurir tercepat...</div>
+        <button class="btn-pesan" id="btnTerima" style="display:none" onclick="selesaikanPesanan('Diterima')">Pesanan Diterima</button>
+        <button class="btn-pesan" style="background:#dc3545" onclick="selesaikanPesanan('Dibatalkan')">Batalkan</button>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
@@ -42,70 +63,73 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let map, markerKurir, markerUser, routeLine;
-        const greenIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', iconSize: [25, 41], iconAnchor: [12, 41] });
-        const blueIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
+        let map, userMarker, kurirMarkers = {};
+        const blueIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41] });
+        const greenIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png', iconSize: [25, 41] });
 
-        function initMap() {
-            map = L.map('map').setView([0, 0], 2); // Default zoom dunia
+        function init() {
+            map = L.map('map').setView([-6.2000, 106.8166], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            markerUser = L.marker([0,0], {icon: greenIcon}).addTo(map);
-            markerKurir = L.marker([0,0], {icon: blueIcon}).addTo(map);
-            routeLine = L.polyline([], {color: 'blue', weight: 3, dashArray: '5, 8'}).addTo(map);
+            userMarker = L.marker([0,0], {icon: greenIcon}).addTo(map);
 
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    const lat = pos.coords.latitude; const lng = pos.coords.longitude;
-                    markerUser.setLatLng([lat, lng]);
-                    map.setView([lat, lng], 16); // Fokus ke lokasi User
-                    db.ref('tracking/transaksi_1/user').set({ lat, lng });
-                    document.getElementById('dialogBox').innerHTML = "<b>Sistem:</b> Siap untuk pesanan baru.";
-                });
-            }
+            // 1. Get User Location
+            navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                userMarker.setLatLng([lat, lng]);
+                map.setView([lat, lng], 15);
+            });
 
-            db.ref('tracking/transaksi_1').on('value', snap => {
+            // 2. Lihat Semua Kurir Online (Standby)
+            db.ref('kurir_online').on('value', snap => {
                 const data = snap.val();
-                if (!data) {
-                    resetUI();
-                    return;
+                // Bersihkan marker lama
+                for(let id in kurirMarkers) map.removeLayer(kurirMarkers[id]);
+                kurirMarkers = {};
+                
+                if(data) {
+                    for(let id in data) {
+                        kurirMarkers[id] = L.marker([data[id].lat, data[id].lng], {icon: blueIcon}).addTo(map)
+                            .bindPopup("Kurir Online");
+                    }
                 }
-                if (data.pesan) document.getElementById('dialogBox').innerHTML = `<b>Pesan:</b> ${data.pesan.teks}`;
-                if (data.status === 'dipilih' || data.status === 'on_way') {
-                    document.getElementById('btnPilih').style.display = "none";
-                    document.getElementById('btnTerima').style.display = "block";
-                    document.getElementById('btnBatal').style.display = "block";
-                }
-                if (data.kurir) {
-                    const kPos = [data.kurir.lat, data.kurir.lng];
-                    markerKurir.setLatLng(kPos);
-                    routeLine.setLatLngs([markerUser.getLatLng(), kPos]);
-                    // Saat pengantaran, zoom ke kedua icon
-                    const group = new L.featureGroup([markerKurir, markerUser]);
-                    map.fitBounds(group.getBounds().pad(0.2));
+            });
+
+            // 3. Pantau Pesanan Aktif
+            db.ref('pesanan/aktif').on('value', snap => {
+                const order = snap.val();
+                if(order) {
+                    document.getElementById('mainMenu').style.display = "none";
+                    document.getElementById('statusOrder').style.display = "block";
+                    if(order.status === 'diambil') {
+                        document.getElementById('dialogBox').innerHTML = `<b>${order.kurirName}</b> sedang menuju lokasi!`;
+                        document.getElementById('btnTerima').style.display = "block";
+                    }
+                } else {
+                    document.getElementById('mainMenu').style.display = "block";
+                    document.getElementById('statusOrder').style.display = "none";
                 }
             });
         }
 
-        function pilihKurir() {
-            db.ref('tracking/transaksi_1').update({ 
-                status: 'dipilih',
-                pesan: { teks: "Menunggu konfirmasi kurir..." }
+        function buatPesanan(namaToko) {
+            const pos = userMarker.getLatLng();
+            db.ref('pesanan/aktif').set({
+                toko: namaToko,
+                status: 'mencari',
+                userLat: pos.lat,
+                userLng: pos.lng,
+                teks: "Pesanan baru dari " + namaToko
             });
         }
 
         function selesaikanPesanan(aksi) {
-            db.ref('tracking/transaksi_1').remove().then(() => {
+            db.ref('pesanan/aktif').remove().then(() => {
                 alert("Pesanan " + aksi);
-                location.reload(); 
+                location.reload();
             });
         }
 
-        function resetUI() {
-            document.getElementById('btnPilih').style.display = "block";
-            document.getElementById('btnTerima').style.display = "none";
-            document.getElementById('btnBatal').style.display = "none";
-        }
-        initMap();
+        init();
     </script>
 </body>
 </html>
