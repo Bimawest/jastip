@@ -24,17 +24,17 @@
         <div class="katalog">
             <div class="card">
                 <img src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=200" alt="Mitra">
-                <div>Warung Sederhana</div>
+                <div style="font-size: 14px; margin-top: 5px;">Warung Sederhana</div>
                 <button class="btn-pesan" onclick="buatPesanan('Warung Sederhana')">Pesan Jastip</button>
             </div>
             <div class="card">
                 <img src="https://images.unsplash.com/photo-1542838132-92c53300491e?w=200" alt="Mitra">
-                <div>Toko Kelontong Ica</div>
+                <div style="font-size: 14px; margin-top: 5px;">Toko Kelontong Ica</div>
                 <button class="btn-pesan" onclick="buatPesanan('Toko Kelontong Ica')">Pesan Jastip</button>
             </div>
             <div class="card">
                 <img src="https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200" alt="Mitra">
-                <div>UMKM Snack Bima</div>
+                <div style="font-size: 14px; margin-top: 5px;">UMKM Snack Bima</div>
                 <button class="btn-pesan" onclick="buatPesanan('UMKM Snack Bima')">Pesan Jastip</button>
             </div>
         </div>
@@ -51,7 +51,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // KREDENSIAL LENGKAP BIMA
         const firebaseConfig = {
             apiKey: "AIzaSyCSwZqJAUvacT-oMJCtgp9tfCfCqxOM9CU",
             authDomain: "jastiptrackingbima.firebaseapp.com",
@@ -69,7 +68,7 @@
         const blueIcon = new L.Icon({ iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png', iconSize: [25, 41], iconAnchor: [12, 41] });
 
         function init() {
-            map = L.map('map').setView([-6.2000, 106.8166], 13);
+            map = L.map('map').setView([0, 0], 2);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             userMarker = L.marker([0,0], {icon: greenIcon}).addTo(map);
 
@@ -79,14 +78,14 @@
                 map.setView([lat, lng], 15);
             });
 
-            // User bisa melihat semua kurir online
+            // Pantau kurir standby
             db.ref('kurir_online').on('value', snap => {
                 const data = snap.val();
                 for(let id in kurirMarkers) map.removeLayer(kurirMarkers[id]);
                 kurirMarkers = {};
                 if(data) {
                     for(let id in data) {
-                        kurirMarkers[id] = L.marker([data[id].lat, data[id].lng], {icon: blueIcon}).addTo(map).bindPopup("Kurir Aktif");
+                        kurirMarkers[id] = L.marker([data[id].lat, data[id].lng], {icon: blueIcon}).addTo(map);
                     }
                 }
             });
@@ -97,7 +96,7 @@
                     document.getElementById('mainMenu').style.display = "none";
                     document.getElementById('statusOrder').style.display = "block";
                     if(order.status === 'diambil') {
-                        document.getElementById('dialogBox').innerHTML = `<b>${order.kurirName}</b> menang rebutan! Sedang meluncur.`;
+                        document.getElementById('dialogBox').innerHTML = `<b>Kurir Bima</b> menang rebutan! Sedang meluncur.`;
                         document.getElementById('btnTerima').style.display = "block";
                     }
                 } else {
@@ -110,11 +109,8 @@
         function buatPesanan(toko) {
             const pos = userMarker.getLatLng();
             db.ref('pesanan/aktif').set({
-                toko: toko,
-                status: 'mencari',
-                userLat: pos.lat,
-                userLng: pos.lng,
-                teks: "Menunggu kurir mengambil pesanan..."
+                toko: toko, status: 'mencari',
+                userLat: pos.lat, userLng: pos.lng
             });
         }
 
